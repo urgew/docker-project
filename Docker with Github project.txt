@@ -1,0 +1,80 @@
+
+ Docker with Github
+----------------------
+
+1. mkdir github-docker-test
+   cd github-docker-test 
+
+2. Create index.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Docker Test</title>
+</head>
+<body>
+    <h1>Hello from GitHub Actions!</h1>
+    <p>My first CI Docker image.</p>
+</body>
+</html>
+
+3. Create a Dockerfile Create a file named exactly: Dockerfile with put in below files
+----------------------------------------------------------------------------------------
+FROM nginx:alpine
+
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 80
+
+
+4. Create GitHub Secrets for used for below action
+--------------------------------------------------
+In your GitHub repository:
+
+Settings → Secrets and variables → Actions → New repository secret
+
+Create:
+Name:
+DOCKERHUB_USERNAME
+
+Secret:
+put your Docker Hub username - urgew
+
+5. Create GitHub Actions workflow
+---------------------------------------
+Create:
+
+.github/workflows/docker.yml
+
+name: Build Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/github-docker-test:latest .
+
+
+6. Push to GitHub
+---------------------
+git init
+git add .
+git commit -m "Initial Docker test"
+git branch -M main
+git remote add origin https://github.com/urgew/urge-git-project     -------> my git repo
+git push -u origin main
+
+7. Next exercise
+----------------
+Exercise 2: GitHub → Actions → Docker build → Docker Hub → Kubernetes
