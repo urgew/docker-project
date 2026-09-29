@@ -15,4 +15,4 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/github-docker-test1:latest .
+          docker build -t github-docker-test1:latest .
