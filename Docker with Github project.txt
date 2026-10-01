@@ -18,8 +18,8 @@
 </body>
 </html>
 
-3. Create a Dockerfile Create a file named exactly: Dockerfile with put in below files
----------------------------------------------------------------------------------------
+3. Create a Dockerfile Create a file named exactly: Dockerfile with put in below files(Dockerfile must be not .txt)
+-------------------------------------------------------------------------------------------------------------------
 open power shell in the current directroy and put the file : 
 Set-Content -Path Dockerfile -Value "FROM nginx:alpine`n`nCOPY index.html /usr/share/nginx/html/index.html`n`nEXPOSE 80"
 
