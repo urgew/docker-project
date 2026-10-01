@@ -19,7 +19,13 @@
 </html>
 
 3. Create a Dockerfile Create a file named exactly: Dockerfile with put in below files
-----------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------
+open power shell in the current directroy and put the file : 
+Set-Content -Path Dockerfile -Value "FROM nginx:alpine`n`nCOPY index.html /usr/share/nginx/html/index.html`n`nEXPOSE 80"
+
+
+which mean :
+
 FROM nginx:alpine
 
 COPY index.html /usr/share/nginx/html/index.html
@@ -63,7 +69,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/github-docker-test:latest .
+          docker build -t github-docker-test:latest .
 
 
 6. Push to GitHub
@@ -72,9 +78,31 @@ git init
 git add .
 git commit -m "Initial Docker test"
 git branch -M main
-git remote add origin https://github.com/urgew/urge-git-project     -------> my git repo
+git remote add origin https://github.com/urgew/docker-project.git      -------> my new git repo
 git push -u origin main
 
 7. Next exercise
 ----------------
 Exercise 2: GitHub → Actions → Docker build → Docker Hub → Kubernetes
+
+My docker server where i build image is : 10.1.177.200
+-----------------------------------------------------
+docker installation on ubuntu
+---------------------------------
+  sudo apt-get install ca-certificates curl gnupg
+  sudo install -m 0755 -d /etc/apt/keyrings
+  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  sudo chmod a+r /etc/apt/keyrings/docker.asc
+  echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" |   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  sudo apt-get update
+  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  systemctl status docker
+  sudo systemctl enable --now docker
+
+test the docker by: sudo docker run hello-world
+
+i created index.html  and Dockerfile then build :  docker build -t github-docker-test:latest .
+check the build images by using command :  docker images
+
+
