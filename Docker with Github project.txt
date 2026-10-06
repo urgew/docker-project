@@ -1,0 +1,216 @@
+
+ Docker with Github
+----------------------
+
+1. mkdir github-docker-test
+   cd github-docker-test 
+
+2. Create index.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Docker Test</title>
+</head>
+<body>
+    <h1>Hello from GitHub Actions!</h1>
+    <p>My first CI Docker image.</p>
+</body>
+</html>
+
+3. Create a Dockerfile Create a file named exactly: Dockerfile with put in below files(Dockerfile must be not .txt)
+-------------------------------------------------------------------------------------------------------------------
+open power shell in the current directroy and put the file : 
+Set-Content -Path Dockerfile -Value "FROM nginx:alpine`n`nCOPY index.html /usr/share/nginx/html/index.html`n`nEXPOSE 80"
+
+
+which mean :
+
+FROM nginx:alpine
+
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 80
+
+
+4. Create GitHub Secrets for used for below action
+--------------------------------------------------
+In your GitHub repository:
+
+Settings → Secrets and variables → Actions → New repository secret
+
+Create:
+Name:
+DOCKERHUB_USERNAME
+
+Secret:
+put your Docker Hub username - urgew
+
+5. Create GitHub Actions workflow
+---------------------------------------
+Create:
+
+.github/workflows/docker-ci.yml
+
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+# Required permissions to write packages to your GitHub profile
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # This saves it as ghcr.io/urgew/docker-project/github-docker-test1:latest
+          tags: ghcr.io/${{ github.repository }}/github-docker-test1:latest
+
+
+
+6. Push to GitHub
+---------------------
+git init
+git add .
+git commit -m "Initial Docker test"
+git branch -M main
+git remote add origin https://github.com/urgew/docker-project.git      -------> my new git repo
+git push -u origin main
+
+7. completed jobs on git hub action
+---------------------------------------
+
+Congratulations! Now that your GitHub Action has successfully built and pushed the image, 
+it is stored securely in the GitHub Container Registry (GHCR).
+
+8. to check the build and pushed image
+-----------------------------------------
+login into your github --> docker-project --> scroll down in the Right hand side -->look for packages--> now you got the image
+
+9. To pull fresh generated docker image to local laptop
+------------------------------------------------------
+  you must first authenticate your terminal with GitHub's registry:
+Step 1: Generate a GitHub Personal Access Token (PAT)
+---------------------------------------------------------
+       Because you are pulling from a terminal outside of GitHub Actions, your regular GitHub password will not work. You need a token.
+      1. On GitHub, click your profile picture (top right) > Settings.
+      2. Scroll down the left sidebar and click Developer settings > Personal access tokens > Tokens (classic).
+      3. Click Generate new token (classic).
+      4. Give it a note (e.g., "Docker Pull") and check the box for read:packages.
+      5. Click Generate token and copy the long string of letters and numbers (it starts with ghp_).
+
+
+
+Step 2: Log in from your Terminal
+------------------------------------
+      Open your Ubuntu terminal and log into the registry using your username and the token you just copied:
+bash
+     echo "YOUR_GITHUB_TOKEN_HERE" | docker login ghcr.io -u urgew --password-stdin
+
+   in our side :  echo "token" | docker login ghcr.io -u urgew --password-stdin
+ 
+ 
+Step 3: Pull and Inspect the Image
+----------------------------------
+  Run the docker pull command to download your newly hosted image from GitHub:bash
+      docker pull ghcr.io/urgew/docker-project/github-docker-test1:latest
+
+
+
+Additional if you need separate docker server to build docker image use below server
+
+My docker server where i build image is : 10.1.177.200
+-----------------------------------------------------
+docker installation on ubuntu
+---------------------------------
+  sudo apt-get install ca-certificates curl gnupg
+  sudo install -m 0755 -d /etc/apt/keyrings
+  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  sudo chmod a+r /etc/apt/keyrings/docker.asc
+  echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" |   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  sudo apt-get update
+  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  systemctl status docker
+  sudo systemctl enable --now docker
+
+test the docker by: sudo docker run hello-world
+
+i created index.html  and Dockerfile then build :  docker build -t github-docker-test:latest .
+check the build images by using command :  docker images
+
+
+10. Run the build and pushed images on kuberentes cluster
+---------------------------------------------------------
+Before trying to pull it in Kubernetes, make sure your image is visible:
+
+1. Go to your repository on GitHub and look under the Packages column on the right.
+2. Click on your package (github-docker-test1).
+3. Click on Package settings (on the right sidebar).
+4. Scroll down to the Danger Zone and check if it is public. If it is private, click Change visibility and set it to Public.
+
+          note: My is already public, no need to change
+
+Test the image on docker before deploy to kubernetes
+--------------------------------------------------
+docker run -d -p 8080:80 ghcr.io/urgew/docker-project/github-docker-test1:latest
+
+ chech if it is up or not using : docker ps  then on webbrowser   http://10.1.177.200:8080/
+
+output: Hello from GitHub Actions!
+
+        My first CI Docker image
+
+
+11. How to Pull it in Kubernetes (If Public)
+----------------------------------------------------
+Create a manifest file named deployment.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-lb-deployment
+  labels:
+    app: nginx-lb
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-lb
+  template:
+    metadata:
+      labels:
+        app: nginx-lb
+  spec:
+    containers:
+    - name: web-server
+      # Point this directly to your GitHub Registry URL
+      image: ghcr.io/urgew/docker-project/github-docker-test1:latest
+      ports:
+      - containerPort: 80
+      imagePullPolicy: Always
+
+12. Deploy it to your cluster:
+---------------------------------
+kubectl apply -f deployment.yaml
