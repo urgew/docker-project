@@ -128,7 +128,7 @@ Step 2: Log in from your Terminal
 bash
      echo "YOUR_GITHUB_TOKEN_HERE" | docker login ghcr.io -u urgew --password-stdin
 
-   in our side :  echo "token" | docker login ghcr.io -u urgew --password-stdin
+   in our side :  echo "your github token" | docker login ghcr.io -u urgew --password-stdin
  
  
 Step 3: Pull and Inspect the Image
