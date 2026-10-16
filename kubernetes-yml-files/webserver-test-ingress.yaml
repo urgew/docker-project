@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webserver-test-ingress
+  namespace: webserver-test
+spec:
+  ingressClassName: nginx-ingress-by-urge
+  rules:
+    - host: webserver-urge-test.cbo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webserver-test-service
+                port:
+                  number: 80
+

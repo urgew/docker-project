@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver-test-deployment
+  namespace: webserver-test
+  labels:
+    app: webserver-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webserver-test
+  template:
+    metadata:
+      labels:
+        app: webserver-test
+  spec:
+    containers:
+    - name: web-server
+      # Point this directly to your GitHub Registry URL
+      image: ghcr.io/urgew/docker-project/github-docker-test1:latest
+      ports:
+      - containerPort: 80
+      imagePullPolicy: Always
+
+

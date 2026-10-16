@@ -58,34 +58,55 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
-# Required permissions to write packages to your GitHub profile
 permissions:
   packages: write
   contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/github-docker-webserver
 
 jobs:
   docker-build:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
+      # 2. Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v5
+      # 3. Build and push development image when code is pushed to main
+      - name: Build and Push Development Image
+        if: startsWith(github.ref, 'refs/heads/')
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          # This saves it as ghcr.io/urgew/docker-project/github-docker-test1:latest
-          tags: ghcr.io/${{ github.repository }}/github-docker-test1:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      # 4. Build and push release image when Git tag is created
+      - name: Build and Push Release Image
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
 
 
 
@@ -183,25 +204,103 @@ output: Hello from GitHub Actions!
         My first CI Docker image
 
 
-11. How to Pull it in Kubernetes (If Public)
+Kubernetes CICD
+--------------------
+
+
+1. Create name space : webserver-test
+----------------------------------------
+kubectl create namespace webserver-test
+
+ Install MetalLB
+--------------------
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.1/config/manifests/metallb-native.yaml
+
+kubectl get pods -n metallb-system -w
+
+ let's configure the MetalLB IP pool.(10.1.177.39-10.1.177.41)
+----------------------------------------
+Create metallb-config.yaml
+
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: onprem-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 10.1.177.39-10.1.177.41
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: onprem-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - onprem-pool
+
+Apply
+-------
+kubectl apply -f metallb-config.yaml
+
+
+Verify
+------
+kubectl get ipaddresspools -n metallb-system
+kubectl get l2advertisements -n metallb-system
+kubectl describe ipaddresspool onprem-pool -n metallb-system
+
+2. Install NGINX Ingress Controller
+-------------------------------------
+helm upgrade --install nginx-ingress-by-urge \
+  oci://ghcr.io/nginx/charts/nginx-ingress \
+  --namespace nginx-ingress-by-urge \
+  --create-namespace \
+  --set controller.replicaCount=2 \
+  --set controller.ingressClass.name=nginx-ingress-by-urge \
+  --set controller.ingressClass.create=true \
+  --set controller.service.type=LoadBalancer
+
+ Verify the controller and MetalLB
+------------------------------------
+ kubectl get pods -n nginx-ingress-by-urge
+ kubectl get svc -n nginx-ingress-by-urge
+ kubectl get ingressclass
+ kubectl get ipaddresspools -n metallb-system
+ 
+ kubectl get svc -n nginx-ingress-by-urge : 
+ output :
+ NAME                               TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+nginx-ingress-by-urge-controller   LoadBalancer   10.43.90.152   10.1.177.39   80:30943/TCP,443:31720/TCP   15m
+
+
+ Configure hostname on DNS Server
+ --------------------------------
+ webserver-test.cbo.com is a hostname you can configure in DNS
+ 
+   10.1.177.39  webserver-urge-test.cbo.com
+
+3.  Create Kubernetes Deployment manifest
 ----------------------------------------------------
-Create a manifest file named deployment.yaml:
+ Create a manifest file named deployment-webserver.yaml:
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-lb-deployment
+  name: webserver-test-deployment
+  namespace: webserver-test
   labels:
-    app: nginx-lb
+    app: webserver-test
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: nginx-lb
+      app: webserver-test
   template:
     metadata:
       labels:
-        app: nginx-lb
+        app: webserver-test
   spec:
     containers:
     - name: web-server
@@ -211,6 +310,81 @@ spec:
       - containerPort: 80
       imagePullPolicy: Always
 
-12. Deploy it to your cluster:
----------------------------------
-kubectl apply -f deployment.yaml
+ Apply the deployment
+---------------------
+kubectl apply -f deployment-webserver.yaml  -n webserver-test
+kubectl get pods -n webserver-test
+
+4. Create the Service
+-------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: webserver-test-service
+  namespace: webserver-test
+spec:
+  type: ClusterIP        
+  selector:
+    app: webserver-test
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+ Apply the deployment
+---------------------
+kubectl apply -f webserver-test-service.yaml -n webserver-test
+kubectl get svc -n webserver-test
+
+
+5. Create the Ingress
+----------------------
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webserver-test-ingress
+  namespace: webserver-test
+spec:
+  ingressClassName: nginx-ingress-by-urge
+  rules:
+    - host: webserver-urge-test.cbo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webserver-test-service
+                port:
+                  number: 80
+
+Apply
+---------
+kubectl apply -f webserver-test-ingress.yaml  -n webserver-test
+
+Verfiy
+---------
+kubectl get pods -n webserver-test
+kubectl get svc -n webserver-test
+kubectl get ingress -n webserver-test
+kubectl get ingressclass
+kubectl get svc -n nginx-ingress-by-urge
+--------------------------------------------------
+
+I created all above .yaml files on my local laptop except metallb configuration file
+
+So now i want to sync/work with git (GitHub Actions CI/CD)
+------------------------------------------------------------
+My Laptop (deployment,service and Ingress file) --( using git add, git commit,git push)-->GItHub Repository ---(Git Action)-->Rancher Kubernetes
+
+  Step1 : Push your local YAML files to GitHub
+--------------------------------------------------
+cd "D:\Urge_PC\Documents\My_Doc\Docker-and-Kubernet-Learning\github-docker-test"
+
+Open git shell Here.
+  Check your Git repository: git status
+
+  git add .
+  git commit -m "Add Kubernetes deployment manifests"
+  git push origin main
