@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'kubernetes/**'
+      - 'kubernetes-yml-files/**'
       - '.github/workflows/deploy-kubernetes.yml'
 
 permissions:
