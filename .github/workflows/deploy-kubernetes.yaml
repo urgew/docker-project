@@ -8,7 +8,7 @@ on:
       - main
     paths:
       - 'kubernetes-yml-files/**'
-      - '.github/workflows/deploy-kubernetes.yml'
+      - '.github/workflows/deploy-kubernetes.yaml'
 
 permissions:
   contents: read
