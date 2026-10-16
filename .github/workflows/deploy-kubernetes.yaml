@@ -1,0 +1,61 @@
+
+name: Deploy to Kubernetes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+      - '.github/workflows/deploy-kubernetes.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installDir = Join-Path $env:RUNNER_TEMP "kubectl"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+          $version = (Invoke-RestMethod `
+            "https://dl.k8s.io/release/stable.txt").Trim()
+
+          $url = "https://dl.k8s.io/release/$version/bin/windows/amd64/kubectl.exe"
+          $kubectlPath = Join-Path $installDir "kubectl.exe"
+
+          Invoke-WebRequest -Uri $url -OutFile $kubectlPath
+
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
+
+          & $kubectlPath version --client
+
+      - name: Verify Kubernetes connection
+        shell: powershell
+        run: kubectl get nodes
+
+      - name: Validate manifests
+        shell: powershell
+        run: kubectl apply --dry-run=server -f ./kubernetes/
+
+      - name: Deploy to Kubernetes
+        shell: powershell
+        run: kubectl apply -f ./kubernetes/
+
+      - name: Verify deployment
+        shell: powershell
+        run: |
+          kubectl rollout status deployment/webserver-test-deployment `
+            -n webserver-test --timeout=180s
+          kubectl get deployment,service,ingress -n webserver-test
