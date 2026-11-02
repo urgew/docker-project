@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install kubectl
-        shell: powershell
+        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
 
@@ -42,23 +42,23 @@ jobs:
           & $kubectlPath version --client
 
       - name: Verify Kubernetes connection
-        shell: powershell
+        shell: pwsh
         run: |
           kubectl config current-context
           kubectl get nodes
 
       - name: Validate Kubernetes manifests
-        shell: powershell
+        shell: pwsh
         run: |
           kubectl apply --dry-run=server -f ./kubernetes-yml-files/
 
       - name: Deploy to Kubernetes
-        shell: powershell
+        shell: pwsh
         run: |
           kubectl apply -f ./kubernetes-yml-files/
 
       - name: Verify deployment
-        shell: powershell
+        shell: pwsh
         run: |
           kubectl get deployments -A
           kubectl get pods -A
