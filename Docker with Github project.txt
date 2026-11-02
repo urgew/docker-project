@@ -665,3 +665,16 @@ jobs:
 
  Verify your Windows runner
 -------------------------------
+
+git add .
+git commit -m "Update Kubernetes manifests"
+git push origin main
+
+Monitor deployment
+----------------------
+from git action
+
+
+start Self hosted hit runner (If Self hosted git runner is offline or my laptop)
+-----------------------------------------------------------------------------------
+open power shell-->cd actions-runner --> ./run.cmd
