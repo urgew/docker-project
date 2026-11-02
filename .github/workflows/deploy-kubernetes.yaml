@@ -22,22 +22,35 @@ jobs:
         shell: cmd
 
     steps:
+      # Make Windows PowerShell available to GitHub Actions
+      - name: Add Windows PowerShell to PATH
+        shell: cmd
+        run: |
+          echo C:\Windows\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%"
+          if not exist "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" exit /b 1
+
+      # Download repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Check installed kubectl
       - name: Check kubectl
         run: kubectl version --client
 
+      # Verify Rancher Kubernetes connection
       - name: Verify Kubernetes connection
         run: |
           kubectl config current-context
           kubectl get nodes
 
+      # Validate Kubernetes YAML files
       - name: Validate manifests
         run: kubectl apply --dry-run=server -f ./kubernetes-yml-files/
 
+      # Deploy resources
       - name: Deploy to Kubernetes
         run: kubectl apply -f ./kubernetes-yml-files/
 
+      # Verify deployed resources
       - name: Verify deployment
         run: kubectl get deployments,services,ingresses -A
