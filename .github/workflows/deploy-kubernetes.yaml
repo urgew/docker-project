@@ -1,8 +1,8 @@
+
 name: Deploy to Kubernetes
 
 on:
   workflow_dispatch:
-
   push:
     branches:
       - main
@@ -17,44 +17,27 @@ jobs:
   deploy:
     runs-on: self-hosted
 
+    defaults:
+      run:
+        shell: cmd
+
     steps:
-      - name: Add PowerShell to PATH
-        shell: cmd
-        run: |
-          echo %WINDIR%\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%" 
-      - name: Fix PowerShell PATH
-        shell: cmd
-        run: |
-          echo C:\Windows\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%"
-          if exist "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" (
-            echo PowerShell executable found
-          ) else (
-            echo PowerShell executable NOT found
-            exit /b 1
-          )
- 
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check kubectl
+        run: kubectl version --client
+
       - name: Verify Kubernetes connection
-        shell: powershell
         run: |
           kubectl config current-context
           kubectl get nodes
 
-      - name: Validate Kubernetes manifests
-        shell: powershell
-        run: |
-          kubectl apply --dry-run=server -f ./kubernetes-yml-files/
+      - name: Validate manifests
+        run: kubectl apply --dry-run=server -f ./kubernetes-yml-files/
 
       - name: Deploy to Kubernetes
-        shell: powershell
-        run: |
-          kubectl apply -f ./kubernetes-yml-files/
+        run: kubectl apply -f ./kubernetes-yml-files/
 
       - name: Verify deployment
-        shell: powershell
-        run: |
-          kubectl get deployments -A
-          kubectl get pods -A
-          kubectl get services -A
+        run: kubectl get deployments,services,ingresses -A
