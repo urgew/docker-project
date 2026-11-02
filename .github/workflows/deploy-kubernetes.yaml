@@ -22,6 +22,16 @@ jobs:
         shell: cmd
         run: |
           echo %WINDIR%\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%" 
+      - name: Fix PowerShell PATH
+        shell: cmd
+        run: |
+          echo C:\Windows\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%"
+          if exist "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" (
+            echo PowerShell executable found
+          ) else (
+            echo PowerShell executable NOT found
+            exit /b 1
+          )
  
       - name: Checkout repository
         uses: actions/checkout@v4
