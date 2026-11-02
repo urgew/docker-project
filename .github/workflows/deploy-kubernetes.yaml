@@ -18,6 +18,11 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Add PowerShell to PATH
+        shell: cmd
+        run: |
+          echo %WINDIR%\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%" 
+ 
       - name: Checkout repository
         uses: actions/checkout@v4
 
