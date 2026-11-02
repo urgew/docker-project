@@ -1,8 +1,8 @@
-
 name: Deploy to Kubernetes
 
 on:
   workflow_dispatch:
+
   push:
     branches:
       - main
@@ -43,19 +43,23 @@ jobs:
 
       - name: Verify Kubernetes connection
         shell: powershell
-        run: kubectl get nodes
+        run: |
+          kubectl config current-context
+          kubectl get nodes
 
-      - name: Validate manifests
+      - name: Validate Kubernetes manifests
         shell: powershell
-        run: kubectl apply --dry-run=server -f ./kubernetes/
+        run: |
+          kubectl apply --dry-run=server -f ./kubernetes-yml-files/
 
       - name: Deploy to Kubernetes
         shell: powershell
-        run: kubectl apply -f ./kubernetes/
+        run: |
+          kubectl apply -f ./kubernetes-yml-files/
 
       - name: Verify deployment
         shell: powershell
         run: |
-          kubectl rollout status deployment/webserver-test-deployment `
-            -n webserver-test --timeout=180s
-          kubectl get deployment,service,ingress -n webserver-test
+          kubectl get deployments -A
+          kubectl get pods -A
+          kubectl get services -A

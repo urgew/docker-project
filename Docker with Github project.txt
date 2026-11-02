@@ -388,3 +388,280 @@ Open git shell Here.
   git add .
   git commit -m "Add Kubernetes deployment manifests"
   git push origin main
+
+  Step 2 — Make sure GitHub can reach your Kubernetes cluster
+--------------------------------------------------------------
+ add a self-hosted Windows runner to your GitHub repository.
+----------------------------------------------------------------
+In your GitHub repository:
+1. Click Settings.
+2. Select Actions → Runners.
+3. Click New self-hosted runner.
+4. Select Windows as the operating system.
+5. Select the appropriate architecture, usually x64.
+GitHub will display instructions specific to your repository, including a download command and a temporary registration token.
+
+Copy below from git hub repo
+----------------------------------
+Download
+
+Open Powershell and run below command
+-----------------------------------------
+We recommend configuring the runner under "\actions-runner". This will help avoid issues related to service identity folder permissions and long path restrictions on Windows.
+# Create a folder under the drive root
+  $ mkdir actions-runner; cd actions-runner
+# Download the latest runner package
+  $ Invoke-WebRequest -Uri https://github.com/actions/runner/releases/download/v2.337.0/actions-runner-win-x64-2.337.0.zip -OutFile actions-runner-win-x64-2.337.0.zip
+# Optional: Validate the hash
+  $ if((Get-FileHash -Path actions-runner-win-x64-2.337.0.zip -Algorithm SHA256).Hash.ToUpper() -ne '1150692afa94e71f872017e254ea55b6eece1eece3fe7e3a6d4c93d0a1b85cfc'.ToUpper()){ throw 'Computed checksum did not match' }
+# Extract the installer
+ $ Add-Type -AssemblyName System.IO.Compression.FileSystem ; [System.IO.Compression.ZipFile]::ExtractToDirectory("$PWD/actions-runner-win-x64-2.337.0.zip", "$PWD")
+
+Configure
+# Create the runner and start the configuration experience
+$ ./config.cmd --url https://github.com/urgew/docker-project --token AILBHMV33BCANZKKM4C7ZILK2IAH2
+# Run it!
+$ ./run.cmd
+
+Using your self-hosted runner
+# Use this YAML in your workflow file for each job
+runs-on: self-hosted
+
+the name of runner is : docker-git-cicd-self-runner
+
+   create a GitHub Actions workflow in your repository.
+--------------------------------------------------------
+Create this file:
+.github/workflows/deploy-kubernetes.yml
+
+and add below files 
+
+
+name: Deploy to Kubernetes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+      - '.github/workflows/deploy-kubernetes.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installDir = Join-Path $env:RUNNER_TEMP "kubectl"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+          $version = (Invoke-RestMethod `
+            "https://dl.k8s.io/release/stable.txt").Trim()
+
+          $url = "https://dl.k8s.io/release/$version/bin/windows/amd64/kubectl.exe"
+          $kubectlPath = Join-Path $installDir "kubectl.exe"
+
+          Invoke-WebRequest -Uri $url -OutFile $kubectlPath
+
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
+
+          & $kubectlPath version --client
+
+      - name: Verify Kubernetes connection
+        shell: powershell
+        run: kubectl get nodes
+
+      - name: Validate manifests
+        shell: powershell
+        run: kubectl apply --dry-run=server -f ./kubernetes/
+
+      - name: Deploy to Kubernetes
+        shell: powershell
+        run: kubectl apply -f ./kubernetes/
+
+      - name: Verify deployment
+        shell: powershell
+        run: |
+          kubectl rollout status deployment/webserver-test-deployment `
+            -n webserver-test --timeout=180s
+          kubectl get deployment,service,ingress -n webserver-test
+
+
+push them to GitHub:
+---------------------
+git add .github/workflows/
+git commit -m "Add self runner test and Kubernetes deployment workflows1"
+git push origin main
+
+  Then check Github Action
+
+download and Installl kubectl on my laptop
+---------------------------------------------
+
+Download kubectl
+------------------
+New-Item -ItemType Directory -Force -Path "C:\kubernetes"
+
+curl.exe --ssl-no-revoke -LO "https://dl.k8s.io/release/v1.37.0/bin/windows/amd64/kubectl.exe"
+
+   or manually download  from https://dl.k8s.io/ and copy to  "C:\kubernetes"
+
+
+
+  PATH Environment Variable by using powershell
+------------------------------------------------
+
+# 1. Get the current actual system path first
+$currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+
+# 2. Prepend your folder to the current path string
+[Environment]::SetEnvironmentVariable("Path", "C:\kubernetes;$currentPath", "Machine")
+
+
+ Verify
+------------
+kubectl version --client
+Client Version: v1.37.1
+Kustomize Version: v5.8.1
+PS C:\WINDOWS\system32>
+
+
+ to ACcess the kubernetes cluster from My laptop(self runner) do below steps
+------------------------------------------------------------------------------------
+
+1. Download the cluster configuration form Rancher
+      Download KubeConfig or Kubeconfig File.  (nutanix-veeamkasten-test-cl) --->kubeconfig file
+
+2. Open PowerShell on your laptop and run:             ------------>I am on this step and continue after joining AD
+       mkdir "$env:USERPROFILE\.kube" -Force
+
+3. Now copy the downloaded file into this folder:
+     C:\Users\urgew\.kube\
+
+after copy it look like C:\Users\urgew\.kube\nutanix-veeamkasten-test-cl.yaml
+but we rename to C:\Users\urgew\.kube\config.yaml  to config again
+
+by using command "Rename-Item "C:\Users\urgew\.kube\config.yaml" "config"
+
+now test the path:  Test-Path "C:\Users\urgew\.kube\config"
+                     True
+
+4.  now run command:
+
+kubectl config get-contexts
+
+output:
+-------
+CURRENT   NAME                                                              CLUSTER                                                           AUTHINFO                      NAMESPACE
+*         nutanix-veeamkasten-test-cl                                       nutanix-veeamkasten-test-cl                                       nutanix-veeamkasten-test-cl
+          nutanix-veeamkasten-test-cl-veeamkasten-test-masternode-8h2m2vh   nutanix-veeamkasten-test-cl-veeamkasten-test-masternode-8h2m2vh   nutanix-veeamkasten-test-cl
+          nutanix-veeamkasten-test-cl-veeamkasten-test-masternode-8hzgdwj   nutanix-veeamkasten-test-cl-veeamkasten-test-masternode-8hzgdwj   nutanix-veeamkasten-test-cl
+
+5. Test the connection
+on powershell:  kubectl get nodes
+
+
+After check my local PC(Self Runnner) is connected to my Kubernetes cluster
+--------------------------------------------------------------------------------
+
+Configure GitHub Secrets
+----------------------------
+Go to:
+
+GitHub Repository → Settings → Secrets and variables → Actions → New repository secret
+
+Secret name:  nutanixVeeamkastenTestClusterKubeconfig
+ Secret * : 
+
+
+To get Secret * :  On your Windows machine, generate the Base64 value using PowerShell:
+
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\.kube\config"))
+
+
+--now copy to the generated file and  paste to GitHub Secret *     and click Add secret.
+
+
+Create GitHub Actions CD workflow  and save belongs to github-docker-test\.github\workflows\deploy-kubernetes.yaml
+--------------------------------------------------------------------------------------------------------------------
+name: Deploy to Kubernetes
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes-yml-files/**'
+      - '.github/workflows/deploy-kubernetes.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installDir = Join-Path $env:RUNNER_TEMP "kubectl"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+          $version = (Invoke-RestMethod `
+            "https://dl.k8s.io/release/stable.txt").Trim()
+
+          $url = "https://dl.k8s.io/release/$version/bin/windows/amd64/kubectl.exe"
+          $kubectlPath = Join-Path $installDir "kubectl.exe"
+
+          Invoke-WebRequest -Uri $url -OutFile $kubectlPath
+
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
+
+          & $kubectlPath version --client
+
+      - name: Verify Kubernetes connection
+        shell: powershell
+        run: |
+          kubectl config current-context
+          kubectl get nodes
+
+      - name: Validate Kubernetes manifests
+        shell: powershell
+        run: |
+          kubectl apply --dry-run=server -f ./kubernetes-yml-files/
+
+      - name: Deploy to Kubernetes
+        shell: powershell
+        run: |
+          kubectl apply -f ./kubernetes-yml-files/
+
+      - name: Verify deployment
+        shell: powershell
+        run: |
+          kubectl get deployments -A
+          kubectl get pods -A
+          kubectl get services -A
+
+
+ Verify your Windows runner
+-------------------------------
