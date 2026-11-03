@@ -1,0 +1,74 @@
+
+name: CI-CD Kubernetes Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+
+  # =========================
+  # CI - Build and Push Image
+  # =========================
+  CI:
+    name: Continuous Integration
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Generate Image Version
+        id: version
+        run: echo "tag=v1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/urgew/docker-project/github-docker-test1:${{ steps.version.outputs.tag }}
+            ghcr.io/urgew/docker-project/github-docker-test1:latest
+
+  # =========================
+  # CD - Deploy to Kubernetes
+  # =========================
+  CD:
+    name: Continuous Deployment
+    needs: CI
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Verify Kubernetes Connection
+        shell: cmd
+        run: |
+          kubectl config current-context
+          kubectl get nodes
+
+      - name: Deploy New Docker Image
+        shell: cmd
+        run: |
+          kubectl set image deployment/webserver-test-deployment web-server=ghcr.io/urgew/docker-project/github-docker-test1:${{ needs.CI.outputs.image_tag }} -n webserver-test
+
+      - name: Verify Deployment
+        shell: cmd
+        run: |
+          kubectl rollout status deployment/webserver-test-deployment -n webserver-test --timeout=180s
+          kubectl get pods -n webserver-test

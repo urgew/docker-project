@@ -294,26 +294,26 @@ metadata:
     app: webserver-test
 spec:
   replicas: 2
+
   selector:
     matchLabels:
       app: webserver-test
+
   template:
     metadata:
       labels:
         app: webserver-test
-  spec:
-    containers:
-    - name: web-server
-      # Point this directly to your GitHub Registry URL
-      image: ghcr.io/urgew/docker-project/github-docker-test1:latest
-      ports:
-      - containerPort: 80
-      imagePullPolicy: Always
+    spec:
+      containers:
+        - name: web-server
+          # Point this directly to your GitHub Registry URL
+          image: ghcr.io/urgew/docker-project/github-docker-test1:latest
+          ports:
+            - containerPort: 80
+          imagePullPolicy: Always
 
- Apply the deployment
----------------------
-kubectl apply -f deployment-webserver.yaml  -n webserver-test
-kubectl get pods -n webserver-test
+
+
 
 4. Create the Service
 -------------------------
@@ -330,11 +330,6 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
-
- Apply the deployment
----------------------
-kubectl apply -f webserver-test-service.yaml -n webserver-test
-kubectl get svc -n webserver-test
 
 
 5. Create the Ingress
@@ -358,19 +353,6 @@ spec:
                 name: webserver-test-service
                 port:
                   number: 80
-
-Apply
----------
-kubectl apply -f webserver-test-ingress.yaml  -n webserver-test
-
-Verfiy
----------
-kubectl get pods -n webserver-test
-kubectl get svc -n webserver-test
-kubectl get ingress -n webserver-test
-kubectl get ingressclass
-kubectl get svc -n nginx-ingress-by-urge
---------------------------------------------------
 
 I created all above .yaml files on my local laptop except metallb configuration file
 
@@ -435,6 +417,8 @@ Create this file:
 .github/workflows/deploy-kubernetes.yml
 
 and add below files 
+------------------------------------------------------------------------
+
 
 
 name: Deploy to Kubernetes
@@ -445,8 +429,8 @@ on:
     branches:
       - main
     paths:
-      - 'kubernetes/**'
-      - '.github/workflows/deploy-kubernetes.yml'
+      - 'kubernetes-yml-files/**'
+      - '.github/workflows/deploy-kubernetes.yaml'
 
 permissions:
   contents: read
@@ -455,49 +439,43 @@ jobs:
   deploy:
     runs-on: self-hosted
 
+    defaults:
+      run:
+        shell: cmd
+
     steps:
+      # Make Windows PowerShell available to GitHub Actions
+      - name: Add Windows PowerShell to PATH
+        shell: cmd
+        run: |
+          echo C:\Windows\System32\WindowsPowerShell\v1.0>>"%GITHUB_PATH%"
+          if not exist "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" exit /b 1
+
+      # Download repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install kubectl
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
+      # Check installed kubectl
+      - name: Check kubectl
+        run: kubectl version --client
 
-          $installDir = Join-Path $env:RUNNER_TEMP "kubectl"
-          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-
-          $version = (Invoke-RestMethod `
-            "https://dl.k8s.io/release/stable.txt").Trim()
-
-          $url = "https://dl.k8s.io/release/$version/bin/windows/amd64/kubectl.exe"
-          $kubectlPath = Join-Path $installDir "kubectl.exe"
-
-          Invoke-WebRequest -Uri $url -OutFile $kubectlPath
-
-          Add-Content -Path $env:GITHUB_PATH -Value $installDir
-
-          & $kubectlPath version --client
-
+      # Verify Rancher Kubernetes connection
       - name: Verify Kubernetes connection
-        shell: powershell
-        run: kubectl get nodes
-
-      - name: Validate manifests
-        shell: powershell
-        run: kubectl apply --dry-run=server -f ./kubernetes/
-
-      - name: Deploy to Kubernetes
-        shell: powershell
-        run: kubectl apply -f ./kubernetes/
-
-      - name: Verify deployment
-        shell: powershell
         run: |
-          kubectl rollout status deployment/webserver-test-deployment `
-            -n webserver-test --timeout=180s
-          kubectl get deployment,service,ingress -n webserver-test
+          kubectl config current-context
+          kubectl get nodes
 
+      # Validate Kubernetes YAML files
+      - name: Validate manifests
+        run: kubectl apply --dry-run=server -f ./kubernetes-yml-files/
+
+      # Deploy resources
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f ./kubernetes-yml-files/
+
+      # Verify deployed resources
+      - name: Verify deployment
+        run: kubectl get deployments,services,ingresses -A
 
 push them to GitHub:
 ---------------------
@@ -541,7 +519,7 @@ PS C:\WINDOWS\system32>
  to ACcess the kubernetes cluster from My laptop(self runner) do below steps
 ------------------------------------------------------------------------------------
 
-1. Download the cluster configuration form Rancher
+1. Download the cluster configuration from Rancher
       Download KubeConfig or Kubeconfig File.  (nutanix-veeamkasten-test-cl) --->kubeconfig file
 
 2. Open PowerShell on your laptop and run:             ------------>I am on this step and continue after joining AD
@@ -675,6 +653,7 @@ Monitor deployment
 from git action
 
 
-start Self hosted hit runner (If Self hosted git runner is offline or my laptop)
+start Self hosted hit runner (If Self hosted git runner is offline on my laptop)
 -----------------------------------------------------------------------------------
 open power shell-->cd actions-runner --> ./run.cmd
+
